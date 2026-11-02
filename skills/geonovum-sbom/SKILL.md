@@ -1,6 +1,6 @@
 ---
 name: geonovum-sbom
-description: "Maak een SBOM (software bill of materials) voor een repository als CycloneDX 1.7 met VEX én SPDX 2.3, volgens de 2026 CISA Minimum Elements en de Cyber Resilience Act (CRA): per component producent, versie, purl/CPE, licentie en hash, alle directe en indirecte afhankelijkheden, tool, auteur en generatiecontext, plus een VEX-analyse van bekende kwetsbaarheden via OSV. Werkt ook voor repositories zonder lockfile: met de hand meegeleverde (vendored) JavaScript/CSS-bestanden, CDN-links in HTML-, PHP- of andere templates, en componenten die de server levert (PHP, Apache, Node.js, Python). Gebruik deze skill zodra iemand vraagt om een SBOM, software bill of materials, sbom.cdx.json of sbom.spdx.json te maken, te vernieuwen of te controleren, om CycloneDX- of SPDX-bestanden, om CRA- of CISA-conformiteit van een SBOM, om VEX voor een project, of om een overzicht van componenten en afhankelijkheden voor een aanbesteding of compliance, ook als het woord SBOM niet valt."
+description: "Maak een SBOM (software bill of materials) voor een repository als CycloneDX 1.7 met VEX én SPDX 2.3, volgens de 2026 CISA Minimum Elements en de Cyber Resilience Act (CRA): per component producent, versie, purl/CPE, licentie en hash, alle directe en indirecte afhankelijkheden, tool, auteur en generatiecontext, plus een VEX-analyse van bekende kwetsbaarheden via OSV. Werkt ook voor repositories zonder lockfile: met de hand meegeleverde (vendored) JavaScript/CSS-bestanden, CDN-links in HTML-, PHP- of andere templates, en componenten die de server levert (PHP, Apache, Node.js, Python). Gebruik deze skill zodra iemand vraagt om een SBOM, software bill of materials, sbom.cdx.json of sbom.spdx.json te maken, te vernieuwen of te controleren, om CycloneDX- of SPDX-bestanden, om CRA- of CISA-conformiteit van een SBOM, om VEX voor een project, om SBOMs automatisch bij elke release te laten maken, of om een overzicht van componenten en afhankelijkheden voor een aanbesteding of compliance, ook als het woord SBOM niet valt."
 license: EUPL-1.2
 allowed-tools: "Bash(node *) Bash(git *)"
 metadata:
@@ -121,7 +121,23 @@ Lees `sbom-gaps.md` en bespreek de open punten. Typisch zijn dat:
 
 Werk ook de README bij als die de SBOM-bestanden of hun formaat beschrijft. Stel voor de inventaris te committen, bijvoorbeeld als `sbom-inventory.json`, zodat de SBOM later reproduceerbaar te vernieuwen is.
 
+### 7. Automatiseer: een SBOM bij elke release
+
+Een SBOM hoort bij één versie. Stel daarom voor om hem bij elke release opnieuw te laten maken, in plaats van hem met de hand te verversen. Op GitHub gaat dat met het sjabloon [`assets/workflows/sbom.yml`](assets/workflows/sbom.yml). Bij het publiceren van een release maakt die workflow de SBOMs uit de gecommitte inventaris. Hij valideert ze, ondertekent ze met een build-attestatie van GitHub, en hangt ze als asset aan de release. Elke week legt hij de componenten opnieuw naast OSV en opent hij een issue als er kwetsbaarheden te beoordelen zijn.
+
+Zo zet je het op:
+
+1. Commit de inventaris als `sbom-inventory.json` in de root, met `"repo": "."`. Laat `product.version` weg: de workflow gebruikt de release-tag.
+2. Kopieer het sjabloon naar `.github/workflows/sbom.yml`. Vervang `__SKILL_REF__` door een release-tag of commit-SHA van de skill-repository. Gebruik nooit een branchnaam: dan komt elke wijziging aan de skill ongemerkt in de workflow terecht.
+3. Heeft de repository een lockfile, voeg dan vóór "SBOM maken" een stap toe die de tool draait (bijvoorbeeld cdxgen) en de uitvoer schrijft naar het pad dat in `import` staat.
+4. Haal gecommitte SBOMs weg zodra de eerste release met SBOM er is, en verwijs in de README naar de release-assets.
+
+Heeft de repository geen releases, omdat de hoofdbranch direct wordt uitgerold? Stel dan voor om bij elke uitrol een tag te zetten. De workflow is ook met de hand te starten; het resultaat staat dan als artefact bij de run.
+
+De inventaris blijft mensenwerk. Pas hem aan als er een component bijkomt, verdwijnt of een andere versie krijgt, en leg in het `vex`-blok vast hoe kwetsbaarheden uit de issues zijn beoordeeld.
+
 ## Wat je oplevert
 
 - `sbom.cdx.json` en `sbom.spdx.json`, gevalideerd.
 - Een kort verslag: welke componenten, welke kwetsbaarheden met welke VEX-status, wat er verschilt met de vorige SBOM (als die er was), welke aannames je deed, en de open punten uit `sbom-gaps.md`.
+- Als de gebruiker dat wil: `sbom-inventory.json` en `.github/workflows/sbom.yml`, zodat de SBOM bij elke release opnieuw wordt gemaakt.
