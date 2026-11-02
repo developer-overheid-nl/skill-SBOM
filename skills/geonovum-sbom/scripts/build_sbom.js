@@ -2,8 +2,9 @@
 // Builds a CycloneDX 1.7 SBOM (with VEX) and an SPDX 2.3 SBOM from an inventory file,
 // covering the 2026 CISA minimum elements. Needs Node 18+ (global fetch) and git for repo hashes.
 //
-// Usage: node build_sbom.js <inventory.json> [--out <dir>] [--no-osv] [--no-fetch]
+// Usage: node build_sbom.js <inventory.json> [--out <dir>] [--version <v>] [--no-osv] [--no-fetch]
 //   --out       directory for sbom.cdx.json, sbom.spdx.json and sbom-gaps.md (default: the repo root)
+//   --version   product version, for example the release tag; overrides product.version
 //   --no-osv    skip the vulnerability lookup at api.osv.dev
 //   --no-fetch  do not download remote (CDN) files to hash them
 //
@@ -14,14 +15,14 @@ const path = require('path');
 const crypto = require('crypto');
 const { execFileSync } = require('child_process');
 
-const TOOL = { name: 'geonovum-sbom build_sbom.js', version: '1.0.0' };
+const TOOL = { name: 'geonovum-sbom build_sbom.js', version: '1.1.0' };
 
 const args = process.argv.slice(2);
 const flag = (f) => args.includes(f);
 const opt = (f) => { const i = args.indexOf(f); return i >= 0 ? args[i + 1] : undefined; };
-const invFile = args.find((a, i) => !a.startsWith('--') && args[i - 1] !== '--out');
+const invFile = args.find((a, i) => !a.startsWith('--') && !['--out', '--version'].includes(args[i - 1]));
 if (!invFile) {
-  console.error('usage: node build_sbom.js <inventory.json> [--out <dir>] [--no-osv] [--no-fetch]');
+  console.error('usage: node build_sbom.js <inventory.json> [--out <dir>] [--version <v>] [--no-osv] [--no-fetch]');
   process.exit(2);
 }
 const inv = JSON.parse(fs.readFileSync(invFile, 'utf8'));
@@ -168,7 +169,7 @@ const main = async () => {
   const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
   const uuid = crypto.randomUUID();
   const p = inv.product;
-  const productVersion = p.version || headCommit;
+  const productVersion = opt('--version') || p.version || headCommit;
   if (!productVersion) gap('Product: geen versie (geen product.version en geen git-repository)');
   const ghMatch = (p.vcs || '').match(/github\.com\/([^/]+)\/([^/.]+)/);
   const productPurl = p.purl || (ghMatch ? `pkg:github/${ghMatch[1]}/${ghMatch[2]}${productVersion ? `@${productVersion}` : ''}` : undefined);

@@ -114,6 +114,7 @@ Teksten die in de SBOM terechtkomen (`description`, `usage`, VEX-`detail`) mogen
 |---|---|
 | `repo` | Root van de repository, relatief ten opzichte van het inventarisbestand. Standaard de map van de inventaris. |
 | `author` | SBOM Author (CISA): de persoon of organisatie die verantwoordelijk is voor de SBOM, meestal de gebruiker. Alleen `name`, `email`, `phone` en `organization` (`true` voor een organisatie of team). |
+| `product.version` | Productversie. Laat weg als de SBOM in een releaseworkflow wordt gemaakt: `build_sbom.js --version <tag>` gaat voor dit veld. Zonder beide wordt de commit-hash gebruikt. |
 | `sbomVersion` | SBOM Version (CISA). Verhoog dit als de SBOM voor dezelfde productversie opnieuw wordt gemaakt. |
 | `lifecycle` | Generatiecontext: `pre-build` (vanuit de broncode, het gewone geval), `build` of `post-build`. |
 | `complete` | Alleen `true` als je zeker weet dat de inventaris alle componenten bevat, ook de indirecte. |

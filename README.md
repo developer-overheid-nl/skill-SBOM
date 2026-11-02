@@ -28,7 +28,8 @@ Vraag je assistent om een SBOM voor een repository, bijvoorbeeld: "Maak een SBOM
 2. laat voor ecosystemen met een lockfile een tool zoals cdxgen of syft de afhankelijkheidsboom maken;
 3. schrijft een inventaris en maakt daarmee met `scripts/build_sbom.js` de twee SBOMs, met hashes van de gecommitte bestanden en kwetsbaarheden uit [OSV](https://osv.dev);
 4. valideert beide bestanden offline tegen de meegeleverde schema's met `scripts/validate_sbom.js`;
-5. rapporteert welke CISA-elementen nog ontbreken (zoals de handtekening) en welke kwetsbaarheden nog geanalyseerd moeten worden.
+5. rapporteert welke CISA-elementen nog ontbreken (zoals de handtekening) en welke kwetsbaarheden nog geanalyseerd moeten worden;
+6. zet desgevraagd de inventaris en de workflow [`assets/workflows/sbom.yml`](skills/geonovum-sbom/assets/workflows/sbom.yml) in de repository. Die maakt de SBOMs dan bij elke GitHub-release opnieuw, valideert en ondertekent ze, en hangt ze aan de release. Elke week controleert hij de componenten opnieuw bij OSV.
 
 Nodig: Node.js 18 of nieuwer en git. Voor de validatie installeert de skill [ajv](https://ajv.js.org) in een tijdelijke map; voor repositories met een lockfile gebruikt hij een SBOM-tool zoals [cdxgen](https://github.com/CycloneDX/cdxgen), na toestemming.
 
