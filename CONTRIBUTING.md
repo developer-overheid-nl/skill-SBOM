@@ -14,7 +14,7 @@ Er zijn verschillende manieren om bij te dragen aan dit project:
 
 ### Meld een bug
 
-Heb je een bug gevonden? Maak dan een [issue](https://github.com/fterpstra/skill-SBOM/issues/new) aan met:
+Heb je een bug gevonden? Maak dan een [issue](https://github.com/developer-overheid-nl/skill-sbom/issues/new) aan met:
 
 - Een duidelijke en beschrijvende titel
 - Stappen om de bug te reproduceren
