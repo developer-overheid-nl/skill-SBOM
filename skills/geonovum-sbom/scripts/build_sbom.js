@@ -14,8 +14,9 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { execFileSync } = require('child_process');
+const osv = require('./osv');
 
-const TOOL = { name: 'geonovum-sbom build_sbom.js', version: '1.1.0' };
+const TOOL = { name: 'geonovum-sbom build_sbom.js', version: '1.2.0' };
 
 const args = process.argv.slice(2);
 const flag = (f) => args.includes(f);
@@ -56,17 +57,6 @@ const fetchBuf = async (url) => {
     return Buffer.from(await res.arrayBuffer());
   } catch (e) {
     try { return run('curl', ['-sSfL', url]); } catch { throw new Error(`${e.message}; curl also failed`); }
-  }
-};
-const fetchJson = async (url, body) => {
-  try {
-    const res = await fetch(url, body ? { method: 'POST', headers: { 'content-type': 'application/json' }, body } : undefined);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
-  } catch {
-    const a = ['-sSfL', url];
-    if (body) a.push('-H', 'content-type: application/json', '--data-binary', '@-');
-    return JSON.parse(execFileSync('curl', a, { input: body, maxBuffer: 1 << 28 }).toString());
   }
 };
 
@@ -146,23 +136,9 @@ const main = async () => {
   // ---------- vulnerabilities (OSV) ----------
   const vulns = [];
   if (!flag('--no-osv')) {
-    const queryable = components.filter((c) => c.purl && c.version && !c.purl.startsWith('pkg:generic') && !c.purl.startsWith('pkg:github'));
-    for (let i = 0; i < queryable.length; i += 500) {
-      const batch = queryable.slice(i, i + 500);
-      const purlWithVersion = (c) => (c.purl.includes('@') ? c.purl : `${c.purl}@${c.version}`);
-      try {
-        const data = await fetchJson('https://api.osv.dev/v1/querybatch',
-          JSON.stringify({ queries: batch.map((c) => ({ package: { purl: purlWithVersion(c) } })) }));
-        (data.results || []).forEach((r, j) => (r.vulns || []).forEach((v) => vulns.push({ c: batch[j], osvId: v.id })));
-      } catch (e) {
-        gap(`opzoeken van kwetsbaarheden bij api.osv.dev mislukt (${e.message}); VEX is onvolledig`);
-      }
-    }
-    const details = {};
-    for (const id of [...new Set(vulns.map((v) => v.osvId))]) {
-      try { details[id] = await fetchJson(`https://api.osv.dev/v1/vulns/${id}`); } catch { details[id] = { id }; }
-    }
-    for (const v of vulns) v.d = details[v.osvId];
+    const found = await osv.lookup(components);
+    vulns.push(...found.vulns);
+    for (const e of found.errors) gap(`opzoeken van kwetsbaarheden bij api.osv.dev mislukt (${e}); VEX is onvolledig`);
   }
 
   // ---------- CycloneDX 1.7 ----------
@@ -238,7 +214,7 @@ const main = async () => {
   const embeddedRefs = (c) => components.filter((x) => x.embeddedIn === c.key).map(refOf);
   const cdxVulns = [];
   const vexFor = (v) => {
-    const id = (v.d.aliases || []).find((a) => a.startsWith('CVE-')) || v.d.id || v.osvId;
+    const id = osv.vulnId(v);
     const o = (inv.vex || {})[`${id}@${v.c.key}`] || (inv.vex || {})[id] || (inv.vex || {})[v.osvId];
     if (o) return { id, ...o };
     if (v.c.used === false) {
@@ -251,8 +227,8 @@ const main = async () => {
   };
   for (const v of vulns) {
     const a = vexFor(v);
-    const fixed = (v.d.affected || []).flatMap((x) => (x.ranges || []).flatMap((r) => (r.events || []).filter((e) => e.fixed).map((e) => e.fixed)));
-    const sev = (v.d.database_specific?.severity || '').toLowerCase().replace('moderate', 'medium');
+    const fixed = osv.fixedVersions(v);
+    const sev = osv.severity(v);
     const isCve = a.id.startsWith('CVE-');
     const existing = cdxVulns.find((x) => x.id === a.id);
     // OSV often has several records (GHSA, PYSEC, ...) for one CVE and package; list each component once.
@@ -268,9 +244,9 @@ const main = async () => {
       source: isCve ? { name: 'NVD', url: `https://nvd.nist.gov/vuln/detail/${a.id}` } : { name: 'OSV', url: `https://osv.dev/vulnerability/${a.id}` },
       references: [v.osvId, ...(v.d.aliases || [])].filter((x, i, arr) => x !== a.id && arr.indexOf(x) === i)
         .map((x) => ({ id: x, source: { name: 'OSV', url: `https://osv.dev/vulnerability/${x}` } })),
-      ratings: sev ? [{ source: { name: 'OSV' }, severity: ['low', 'medium', 'high', 'critical'].includes(sev) ? sev : 'unknown' }] : undefined,
+      ratings: sev ? [{ source: { name: 'OSV' }, severity: sev }] : undefined,
       description: v.d.summary,
-      recommendation: fixed.length ? `Upgrade ${v.c.name} to a fixed version (${[...new Set(fixed)].join(', ')})${v.c.used === false ? ', or remove it' : ''}.` : undefined,
+      recommendation: fixed.length ? `Upgrade ${v.c.name} to a fixed version (${fixed.join(', ')})${v.c.used === false ? ', or remove it' : ''}.` : undefined,
       analysis: {
         state: a.state, justification: a.justification, response: a.response, detail: a.detail,
         firstIssued: now, lastUpdated: now,
@@ -290,6 +266,8 @@ const main = async () => {
       timestamp: now,
       lifecycles: [{ phase: inv.lifecycle || 'pre-build' }],
       tools: { components: tools },
+      // The commit the SBOM describes, so that scan_repo.js --since can tell what changed after it.
+      properties: headCommit ? [{ name: 'geonovum-sbom:commit', value: headCommit }] : undefined,
       // CycloneDX authors only take name, email and phone.
       authors: inv.author ? [{ name: inv.author.name, email: inv.author.email, phone: inv.author.phone }] : undefined,
       manufacturer: org(p.supplier),

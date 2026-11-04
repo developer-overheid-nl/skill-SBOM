@@ -1,8 +1,8 @@
 ---
 name: geonovum-sbom
-description: "Maak een SBOM (software bill of materials) voor een repository als CycloneDX 1.7 met VEX én SPDX 2.3, volgens de 2026 CISA Minimum Elements en de Cyber Resilience Act (CRA): per component producent, versie, purl/CPE, licentie en hash, alle directe en indirecte afhankelijkheden, tool, auteur en generatiecontext, plus een VEX-analyse van bekende kwetsbaarheden via OSV. Werkt ook voor repositories zonder lockfile: met de hand meegeleverde (vendored) JavaScript/CSS-bestanden, CDN-links in HTML-, PHP- of andere templates, en componenten die de server levert (PHP, Apache, Node.js, Python). Gebruik deze skill zodra iemand vraagt om een SBOM, software bill of materials, sbom.cdx.json of sbom.spdx.json te maken, te vernieuwen of te controleren, om CycloneDX- of SPDX-bestanden, om CRA- of CISA-conformiteit van een SBOM, om VEX voor een project, om SBOMs automatisch bij elke release te laten maken, of om een overzicht van componenten en afhankelijkheden voor een aanbesteding of compliance, ook als het woord SBOM niet valt."
+description: "Maak een SBOM (software bill of materials) voor een repository als CycloneDX 1.7 met VEX én SPDX 2.3, volgens de 2026 CISA Minimum Elements en de Cyber Resilience Act (CRA): per component producent, versie, purl/CPE, licentie en hash, alle directe en indirecte afhankelijkheden, tool, auteur en generatiecontext, plus een VEX-analyse van bekende kwetsbaarheden via OSV. Werkt ook voor repositories zonder lockfile: met de hand meegeleverde (vendored) JavaScript/CSS-bestanden, CDN-links in HTML-, PHP- of andere templates, en componenten die de server levert (PHP, Apache, Node.js, Python). Gebruik deze skill zodra iemand vraagt om een SBOM, software bill of materials, sbom.cdx.json of sbom.spdx.json te maken, te vernieuwen of te controleren, om CycloneDX- of SPDX-bestanden, om CRA- of CISA-conformiteit van een SBOM, om VEX voor een project, om SBOMs automatisch bij elke release te laten maken, om een bestaande SBOM bij te werken of doorlopend op kwetsbaarheden te controleren, of om een overzicht van componenten en afhankelijkheden voor een aanbesteding of compliance, ook als het woord SBOM niet valt."
 license: EUPL-1.2
-allowed-tools: "Bash(node *) Bash(git *)"
+allowed-tools: "Bash(node *) Bash(git *) Bash(sed *) Bash(grep *) Bash(cat *)"
 metadata:
   nl.gov.status: concept
   nl.gov.review-by: "2027-04-29"
@@ -30,7 +30,7 @@ De 2026 CISA Minimum Elements vervangen de NTIA-baseline uit 2021. Nieuw verplic
 
 | Element | Waar het in de SBOM staat |
 |---|---|
-| SBOM Author, Author Signature | `metadata.authors`; handtekening: zie stap 6 |
+| SBOM Author, Author Signature | `metadata.authors`; handtekening: zie stap 7 |
 | Formaatnaam en -versie, SBOM-versie | `bomFormat`/`specVersion`, `version`; SPDX `spdxVersion` |
 | Generatiecontext (voor de build, tijdens de build, of achteraf uit binaries) | `metadata.lifecycles`; SPDX `creationInfo.comment` |
 | Toolnaam en toolversie | `metadata.tools`; SPDX `creators: Tool: ...` |
@@ -42,62 +42,109 @@ Een SBOM die wel het formaat volgt maar deze gegevens mist, is voor afnemers en 
 
 ## Werkwijze
 
-### 1. Breng de repository in kaart
+Laat de tooling het werk doen en zoek zelf alleen waar die ophoudt. De meegeleverde scripts geven feiten met bestand en regel. Lees niet de hele repository door: dat kost veel en mist dingen die een script wel vindt.
 
-Zoek uit wat er werkelijk geleverd en gebruikt wordt. Kijk naar:
+### 1. Begin bij de vorige SBOM
 
-- **Lockfiles en manifests**: `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `poetry.lock`, `uv.lock`, `Pipfile.lock`, `requirements*.txt` met vaste versies, `composer.lock`, `Cargo.lock`, `go.sum`, `pom.xml`, `gradle.lockfile`, `Gemfile.lock`.
-- **Vendored bestanden**: `.js`, `.css` en fonts in `static/`, `vendor/`, `resources/`, `public/`, `lib/` en dergelijke. Lees de eerste regels: naam, versie, copyright en licentie staan meestal in de kopregel. Herken ook bestanden met een versie in de naam (`jquery-3.4.1.min.js`).
-- **Ingebedde bibliotheken**: sommige bestanden bevatten een tweede bibliotheek. Voorbeelden zijn Sizzle in jQuery, yepnope in Modernizr, en Popper in `bootstrap.bundle.js`. Zoek in de kopregel en in commentaarblokken verderop in het bestand naar andere naam- en versieregels. Neem zo'n bibliotheek op als eigen component met `embeddedIn`, zodat hij met de hash van het omringende bestand in de SBOM komt en kwetsbaarheden ervan gevonden worden.
-- **CDN- en andere externe links**: zoek in HTML, templates, PHP en JSX naar `<script src=`, `<link href=`, `@import` en `url(` met `//` of `https://`. Een CDN-bestand is een runtime-afhankelijkheid, ook al staat het niet in de repo. Haal het op en kijk of het zelf weer bestanden laadt, zoals een CSS die fonts laadt. Die horen erbij, als bestanden van dezelfde component.
-- **Wat de omgeving levert**: runtime en server uit README, Dockerfile, CI-configuratie, `composer.json` `require.php`, `engines` in package.json of `.python-version`. Zoek naar gebruikte extensies, bijvoorbeeld `ZipArchive` voor de PHP zip-extensie. Neem deze op als `external` met een `range`.
-- **Gebruikt of niet?** Zoek voor elk vendored bestand of een pagina of module het laadt. Ook een ongebruikt bestand blijft in de SBOM, want het wordt geleverd en vaak publiek geserveerd, maar dan met `used: false`. Dat bepaalt de VEX-analyse, dus controleer het echt met een zoekopdracht op de bestandsnaam.
-- **Configuratie van webserver of build** (rewrite-regels, `static`-mappen, bundler-configuratie): die bepaalt of vendored bestanden publiek bereikbaar zijn. Noem dat in `usage`.
+Staat er al een SBOM of een `sbom-inventory.json`, maak dan geen nieuwe inventaris maar kijk wat er sindsdien veranderd is:
 
-Neem geen eigen code, documentatie, afbeeldingen of logo's op als component; alleen software van derden en wat de omgeving moet leveren. De eigen code is het product (`product`).
+```bash
+node <skillmap>/scripts/scan_repo.js <repo> --since <vorige sbom.cdx.json of tag> --inventory sbom-inventory.json
+```
 
-### 2. Gebruik een tool voor ecosystemen met een lockfile
+Een SBOM die met deze skill is gemaakt (versie 1.2 of later), noemt de commit die hij beschrijft; anders geef je de tag of commit van de vorige SBOM mee. Het script zegt welke manifests, lockfiles, bestanden van derden, externe links, omgevingsbestanden en PHP-extensies zijn gewijzigd, en wat er niet meer klopt met de inventaris.
 
-Heeft de repo een lockfile, laat dan een tool de afhankelijkheidsboom maken, want met de hand mis je indirecte afhankelijkheden. Bijvoorbeeld:
+- **Niets relevants gewijzigd:** de inventaris blijft zoals hij is. Ga door naar stap 6; het script maakt een nieuwe SBOM met de nieuwe versie, de hashes en de actuele kwetsbaarheden.
+- **Wel wijzigingen:** werk alleen die bij, met stap 2 tot en met 5.
+
+### 2. Draai de tooling
+
+Eerst de scan van de hele repository:
+
+```bash
+node <skillmap>/scripts/scan_repo.js <repo>
+```
+
+Die geeft, met bestand en regel:
+
+- **Manifests en lockfiles** per ecosysteem, en in `requirements.txt` de regels zonder vaste versie.
+- **Bestanden van derden**: `.js`, `.css` en fonts met naam, versie en licentie uit de kopregel of de bestandsnaam, en bibliotheken die erin zijn ingebed (zoals yepnope in Modernizr).
+- **Of ze geladen worden**: welke bestanden ernaar verwijzen, zonder commentaar mee te tellen. "Niets gevonden" wijst op `used: false`.
+- **CDN- en andere externe links** in HTML, templates, PHP en CSS, met de naam en versie uit de URL.
+- **Wat de omgeving levert**: `FROM` in Dockerfiles, runtimeversies, `engines`, `require.php` en `ext-*` in composer.json, versies in de README, en PHP-extensies uit de functies die de code gebruikt.
+- **Metadata**: product, licentie, copyright, auteur en contactpersonen, elk met het bestand waar het staat.
+
+Heeft de repo een lockfile, laat dan een tool de afhankelijkheidsboom maken, want met de hand mis je indirecte afhankelijkheden:
 
 ```bash
 npx --yes @cyclonedx/cdxgen@11 -t <ecosysteem> -o bom.tool.cdx.json --spec-version 1.6 <repo>
 ```
 
-`syft <repo> -o cyclonedx-json=bom.tool.cdx.json` kan ook. Schrijf de tooluitvoer buiten de repo en neem hem op via `import` in de inventaris. Vraag de gebruiker toestemming voordat je een tool downloadt die nog niet geïnstalleerd is.
-
-Let op twee dingen in tooluitvoer:
+`syft <repo> -o cyclonedx-json=bom.tool.cdx.json` kan ook. Schrijf de tooluitvoer buiten de repo en neem hem op via `import` in de inventaris. Vraag de gebruiker toestemming voordat je een tool downloadt die nog niet geïnstalleerd is. Let op twee dingen in tooluitvoer:
 
 - Zonder geïnstalleerde `node_modules` markeert cdxgen indirecte afhankelijkheden soms als `optional`. Zijn het runtime-afhankelijkheden, zet de scope dan op `required`.
 - Tooluitvoer heeft vaak geen producent per pakket. Vul die aan uit de registry (auteur, anders de eerste maintainer) en noem dat in het verslag.
 
-Is er alleen een `requirements.txt` met de directe afhankelijkheden, bepaal de indirecte dan met de pakketbeheerder voor het juiste platform, bijvoorbeeld `pip install --dry-run --report` voor de Python-versie en het besturingssysteem uit de Dockerfile. Zeg in het verslag dat een nieuwe build andere indirecte versies kan opleveren dan de draaiende installatie.
+### 3. Bouw, als de versies daarvan afhangen
 
-Vendored bestanden en CDN-links zitten nooit in de tooluitvoer, ook niet in een repo met lockfile. Voeg die altijd met de hand toe.
+Welke versies er echt geleverd worden, hangt af van de build. Met een lockfile ligt alles vast. Zonder lockfile, met versiebereiken in een manifest of met een `requirements.txt` zonder `==`, bepaalt pas de installatie welke versies het worden, en die kunnen per build verschillen. Een SBOM die dan alleen uit de broncode komt, beschrijft een gok.
 
-### 3. Schrijf de inventaris
+Bouw of installeer in dat geval zoals de release wordt gebouwd, en laat de tool de geïnstalleerde boom lezen, bijvoorbeeld:
+
+- **npm**: `npm ci --omit=dev`, dan cdxgen met `--required-only`.
+- **Python**: installeer in een schone virtuele omgeving met de Python-versie en het platform uit de Dockerfile, dan cdxgen of `syft` op die omgeving. Kan dat niet, gebruik dan `pip install --dry-run --report` en zeg in het verslag dat een nieuwe build andere versies kan opleveren.
+- **PHP**: `composer install --no-dev`, dan cdxgen op `vendor/`.
+- **Een container-image**: `syft <image>` op het gebouwde image.
+
+Zet `lifecycle` in de inventaris dan op `build`. Het beste gebeurt dit in de release-workflow (stap 8), zodat de SBOM de build van die release beschrijft. Heeft de repo geen buildstap, zoals een PHP-site met meegeleverde bestanden, dan is `pre-build` juist.
+
+Vendored bestanden en CDN-links zitten nooit in de tooluitvoer, ook niet na een build. Die komen uit de scan.
+
+### 4. Zoek zelf waar de tooling ophoudt
+
+Loop de kandidaten uit de scan na. Neem ze niet blind over:
+
+- **Naam of versie onbekend**: lees de kop van het bestand (`sed -n '1,15p' <bestand>`) of zoek naar een versie (`grep -m3 -nE 'v?[0-9]+\.[0-9]+\.[0-9]+' <bestand>`).
+- **Ingebedde bibliotheken**: controleer de gevonden regel en neem de bibliotheek op als eigen component met `embeddedIn`. Bekende gevallen die de scan kan missen: Sizzle in jQuery, Popper in `bootstrap.bundle.js`.
+- **CDN-bestanden**: haal ze op en kijk of ze zelf weer bestanden laden, zoals een CSS die fonts laadt. Die horen erbij, als bestanden van dezelfde component.
+- **Gebruikt of niet**: "niets gevonden" is een aanwijzing, geen bewijs. Een bestand kan via een bundler, een variabele of een rewrite-regel geladen worden. Controleer het en leg de conclusie vast in `used` en `usage`, want die bepaalt de VEX-analyse. Ook een ongebruikt bestand blijft in de SBOM: het wordt geleverd en vaak publiek geserveerd.
+- **Omgeving**: neem runtime, server en extensies uit de scan op als `external` met een `range`.
+- **Eigen code**: de scan kan eigen bestanden in een map als `static/` melden. Neem geen eigen code, documentatie, afbeeldingen of logo's op als component, alleen software van derden en wat de omgeving moet leveren. De eigen code is het product (`product`).
+
+### 5. Schrijf de inventaris
 
 Schrijf een `inventory.json` volgens [`inventaris-formaat.md`](inventaris-formaat.md). Lees dat bestand voordat je begint; het beschrijft elk veld en de VEX-standaarden.
 
+Haal de metavelden uit de bestanden die de scan noemt, niet uit de context van het gesprek. Controleer ze met een korte opdracht:
+
+```bash
+git remote get-url origin                                         # product.vcs
+git describe --tags --abbrev=0                                    # product.version
+sed -n '1p;/[Cc]opyright/p' LICENSE                               # licentie en copyrighthouder
+sed -n '/^legal:/,/^[a-z]/p;/^maintenance:/,/^[a-z]/p' publiccode.yml   # licentie, eigenaar, contactpersonen
+cat .github/CODEOWNERS                                            # beheerders
+git config user.name; git config user.email                       # wie de SBOM nu maakt
+```
+
 Aandachtspunten die vaak fout gaan:
 
+- **auteur**: de SBOM-auteur is wie verantwoordelijk is voor de SBOM, meestal de beheerder uit `publiccode.yml` of `CODEOWNERS`, anders wie de skill draait. Vraag het de gebruiker alleen als die bronnen ontbreken of elkaar tegenspreken. Is de auteur een organisatie of team, zet dan `"organization": true`.
 - **purl**: gebruik het ecosysteem waar de code vandaan komt, ook als het bestand met de hand is gekopieerd (`pkg:npm/jquery@1.9.1`). Alleen zo vindt OSV de kwetsbaarheden.
 - **licentie**: `declared` is wat de component zelf zegt, letterlijk. `license` is wat jij concludeert, als SPDX-expressie. Verschillen ze (de kop zegt "MIT & BSD", jij concludeert `MIT`), noem dat dan.
 - **producent**: de organisatie die de component maakt (de OpenJS Foundation voor jQuery), niet de CDN.
 - **productversie**: een release-tag als die er is, anders de versie uit het manifest. Ontbreken beide, dan vult het script de commit-hash in.
-- **auteur**: vraag de gebruiker wie als SBOM-auteur moet staan als dat niet uit de context blijkt. Is de auteur een organisatie of team, zet dan `"organization": true`.
 
-### 4. Draai het script
+### 6. Maak en valideer de SBOM
 
 ```bash
 node <skillmap>/scripts/build_sbom.js <inventory.json> --out <map>
 ```
 
-Het script hasht bestanden uit de repo vanaf de **gecommitte versie** (`git show HEAD:pad`), niet vanaf de werkkopie. Op Windows zet `core.autocrlf` de regeleinden om, en dan krijg je hashes die niemand anders kan reproduceren. Externe bestanden worden gedownload en gehasht. Kwetsbaarheden komen van api.osv.dev.
+Het script hasht bestanden uit de repo vanaf de **gecommitte versie** (`git show HEAD:pad`), niet vanaf de werkkopie. Op Windows zet `core.autocrlf` de regeleinden om, en dan krijg je hashes die niemand anders kan reproduceren. Externe bestanden worden gedownload en gehasht. Kwetsbaarheden komen van api.osv.dev. De commit komt in de SBOM, zodat stap 1 de volgende keer werkt.
 
 Schrijf eerst naar een tijdelijke map en vergelijk met bestaande SBOMs in de repo voordat je iets overschrijft. Zeg wat er inhoudelijk verschilt.
 
-### 5. Valideer
+Valideer daarna:
 
 ```bash
 npm install --prefix <tijdelijke-map> ajv@8 ajv-formats@3
@@ -108,7 +155,7 @@ Dit valideert offline tegen de meegeleverde schema's (CycloneDX 1.7 met subschem
 `cyclonedx validate --input-file sbom.cdx.json --input-version v1_7 --fail-on-errors`.
 Los fouten op in de inventaris, niet door velden weg te laten.
 
-### 6. Rond af met de gebruiker
+### 7. Rond af met de gebruiker
 
 Lees `sbom-gaps.md` en bespreek de open punten. Typisch zijn dat:
 
@@ -121,23 +168,33 @@ Lees `sbom-gaps.md` en bespreek de open punten. Typisch zijn dat:
 
 Werk ook de README bij als die de SBOM-bestanden of hun formaat beschrijft. Stel voor de inventaris te committen, bijvoorbeeld als `sbom-inventory.json`, zodat de SBOM later reproduceerbaar te vernieuwen is.
 
-### 7. Automatiseer: een SBOM bij elke release
+### 8. Automatiseer: een SBOM bij elke release, en een doorlopende controle
 
-Een SBOM hoort bij één versie. Stel daarom voor om hem bij elke release opnieuw te laten maken, in plaats van hem met de hand te verversen. Op GitHub gaat dat met het sjabloon [`assets/workflows/sbom.yml`](assets/workflows/sbom.yml). Bij het publiceren van een release maakt die workflow de SBOMs uit de gecommitte inventaris. Hij valideert ze, ondertekent ze met een build-attestatie van GitHub, en hangt ze als asset aan de release. Elke week legt hij de componenten opnieuw naast OSV en opent hij een issue als er kwetsbaarheden te beoordelen zijn.
+Een SBOM hoort bij één versie. De kwetsbaarheden van die versie veranderen wel: er komen elke dag meldingen bij. Dat zijn twee aparte taken, met elk een eigen sjabloon:
+
+- [`assets/workflows/sbom.yml`](assets/workflows/sbom.yml) maakt bij elke gepubliceerde release de SBOMs uit de gecommitte inventaris. Hij valideert ze, ondertekent ze met een build-attestatie van GitHub, en hangt ze als asset aan de release.
+- [`assets/workflows/sbom-kwetsbaarheden.yml`](assets/workflows/sbom-kwetsbaarheden.yml) legt elke week de SBOM van de versie die in gebruik is naast OSV, met `check_vulns.js`. Dat is de SBOM die aan de release hangt, niet de broncode op de hoofdbranch. Welke release in gebruik is, staat in de repository-variabele `SBOM_IN_GEBRUIK`; zonder die variabele is het de laatste release. Wat nog beoordeeld moet worden, komt in een issue met het label `sbom`. Beoordelingen in het `vex`-blok van de inventaris tellen mee, ook als ze van na de release zijn.
 
 Zo zet je het op:
 
 1. Commit de inventaris als `sbom-inventory.json` in de root, met `"repo": "."`. Laat `product.version` weg: de workflow gebruikt de release-tag.
-2. Kopieer het sjabloon naar `.github/workflows/sbom.yml`. Vervang `__SKILL_REF__` door een release-tag of commit-SHA van de skill-repository. Gebruik nooit een branchnaam: dan komt elke wijziging aan de skill ongemerkt in de workflow terecht.
-3. Heeft de repository een lockfile, voeg dan vóór "SBOM maken" een stap toe die de tool draait (bijvoorbeeld cdxgen) en de uitvoer schrijft naar het pad dat in `import` staat.
-4. Haal gecommitte SBOMs weg zodra de eerste release met SBOM er is, en verwijs in de README naar de release-assets.
+2. Kopieer beide sjablonen naar `.github/workflows/`. Vervang `__SKILL_REF__` door een release-tag of commit-SHA van de skill-repository. Gebruik nooit een branchnaam: dan komt elke wijziging aan de skill ongemerkt in de workflow terecht.
+3. De actions in de sjablonen zijn vastgezet op een commit-hash, met het versienummer als commentaar. Een tag als `@v7` kan later naar andere code wijzen, een hash niet. Kopieer [`assets/dependabot.yml`](assets/dependabot.yml) naar `.github/dependabot.yml`, zodat Dependabot een pull request opent als er een nieuwe versie is.
+4. Moeten de versies uit een build komen (stap 3), vul dan in `sbom.yml` de stap "Bouwen en afhankelijkheden lezen" in die als commentaar klaarstaat.
+5. Haal gecommitte SBOMs weg zodra de eerste release met SBOM er is, en verwijs in de README naar de release-assets.
 
-Heeft de repository geen releases, omdat de hoofdbranch direct wordt uitgerold? Stel dan voor om bij elke uitrol een tag te zetten. De workflow is ook met de hand te starten; het resultaat staat dan als artefact bij de run.
+Heeft de repository geen releases, omdat de hoofdbranch direct wordt uitgerold? Stel dan voor om bij elke uitrol een tag te zetten. Beide workflows zijn ook met de hand te starten.
 
-De inventaris blijft mensenwerk. Pas hem aan als er een component bijkomt, verdwijnt of een andere versie krijgt, en leg in het `vex`-blok vast hoe kwetsbaarheden uit de issues zijn beoordeeld.
+Een controle kan ook zonder workflow, op elke SBOM:
+
+```bash
+node <skillmap>/scripts/check_vulns.js sbom.cdx.json --vex sbom-inventory.json --out <map>
+```
+
+De inventaris blijft mensenwerk. Pas hem aan als er een component bijkomt, verdwijnt of een andere versie krijgt; stap 1 laat zien wanneer dat nodig is. Leg in het `vex`-blok vast hoe kwetsbaarheden uit de issues zijn beoordeeld.
 
 ## Wat je oplevert
 
 - `sbom.cdx.json` en `sbom.spdx.json`, gevalideerd.
 - Een kort verslag: welke componenten, welke kwetsbaarheden met welke VEX-status, wat er verschilt met de vorige SBOM (als die er was), welke aannames je deed, en de open punten uit `sbom-gaps.md`.
-- Als de gebruiker dat wil: `sbom-inventory.json` en `.github/workflows/sbom.yml`, zodat de SBOM bij elke release opnieuw wordt gemaakt.
+- Als de gebruiker dat wil: `sbom-inventory.json`, `.github/workflows/sbom.yml`, `.github/workflows/sbom-kwetsbaarheden.yml` en `.github/dependabot.yml`, zodat de SBOM bij elke release opnieuw wordt gemaakt en de kwetsbaarheden doorlopend worden gecontroleerd.

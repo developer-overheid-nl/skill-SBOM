@@ -24,12 +24,13 @@ De repository is ook ingericht als plugin `geonovum-sbom`, met manifesten per as
 
 Vraag je assistent om een SBOM voor een repository, bijvoorbeeld: "Maak een SBOM voor deze repo volgens de CISA minimum elements, in CycloneDX en SPDX." De skill:
 
-1. brengt de repository in kaart: lockfiles, meegeleverde bestanden (ook bibliotheken die in een ander bestand zijn ingebed), CDN-links, en wat de server moet leveren;
-2. laat voor ecosystemen met een lockfile een tool zoals cdxgen of syft de afhankelijkheidsboom maken;
-3. schrijft een inventaris en maakt daarmee met `scripts/build_sbom.js` de twee SBOMs, met hashes van de gecommitte bestanden en kwetsbaarheden uit [OSV](https://osv.dev);
-4. valideert beide bestanden offline tegen de meegeleverde schema's met `scripts/validate_sbom.js`;
-5. rapporteert welke CISA-elementen nog ontbreken (zoals de handtekening) en welke kwetsbaarheden nog geanalyseerd moeten worden;
-6. zet desgevraagd de inventaris en de workflow [`assets/workflows/sbom.yml`](skills/geonovum-sbom/assets/workflows/sbom.yml) in de repository. Die maakt de SBOMs dan bij elke GitHub-release opnieuw, valideert en ondertekent ze, en hangt ze aan de release. Elke week controleert hij de componenten opnieuw bij OSV.
+1. begint bij de vorige SBOM, als die er is: `scripts/scan_repo.js --since` laat zien wat er sindsdien is veranderd, zodat alleen dat wordt bijgewerkt;
+2. brengt de repository in kaart met `scripts/scan_repo.js`: lockfiles, meegeleverde bestanden (ook bibliotheken die in een ander bestand zijn ingebed) en of ze geladen worden, CDN-links, wat de server moet leveren, en waar de metadata staan, telkens met bestand en regel;
+3. laat voor ecosystemen met een lockfile een tool zoals cdxgen of syft de afhankelijkheidsboom maken, zo nodig na een build of installatie, zodat de versies kloppen die echt worden geleverd;
+4. zoekt zelf alleen na wat de tooling niet kan vaststellen;
+5. schrijft een inventaris en maakt daarmee met `scripts/build_sbom.js` de twee SBOMs, met hashes van de gecommitte bestanden en kwetsbaarheden uit [OSV](https://osv.dev), en valideert ze offline met `scripts/validate_sbom.js`;
+6. rapporteert welke CISA-elementen nog ontbreken (zoals de handtekening) en welke kwetsbaarheden nog geanalyseerd moeten worden;
+7. zet desgevraagd de inventaris en twee workflows in de repository. [`sbom.yml`](skills/geonovum-sbom/assets/workflows/sbom.yml) maakt de SBOMs bij elke GitHub-release opnieuw, valideert en ondertekent ze, en hangt ze aan de release. [`sbom-kwetsbaarheden.yml`](skills/geonovum-sbom/assets/workflows/sbom-kwetsbaarheden.yml) legt elke week de SBOM van de versie die in gebruik is naast OSV, met `scripts/check_vulns.js`. De actions in beide zijn vastgezet op een commit-hash.
 
 Nodig: Node.js 18 of nieuwer en git. Voor de validatie installeert de skill [ajv](https://ajv.js.org) in een tijdelijke map; voor repositories met een lockfile gebruikt hij een SBOM-tool zoals [cdxgen](https://github.com/CycloneDX/cdxgen), na toestemming.
 
