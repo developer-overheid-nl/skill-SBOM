@@ -52,7 +52,7 @@ In `skills/geonovum-sbom/evals/` staan drie testcases: een repository zonder loc
 
 ## Bijdragen
 
-Fouten in de skill meld je als [issue](https://github.com/fterpstra/skill-SBOM/issues). Werkafspraken voor wijzigingen staan in [CONTRIBUTING.md](CONTRIBUTING.md).
+Fouten in de skill meld je als [issue](https://github.com/developer-overheid-nl/skill-sbom/issues). Werkafspraken voor wijzigingen staan in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Licentie
 

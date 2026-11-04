@@ -30,7 +30,7 @@ permissions:
   contents: read
 
 env:
-  SKILL_REPO: fterpstra/skill-SBOM
+  SKILL_REPO: developer-overheid-nl/skill-sbom
   SKILL_REF: __SKILL_REF__
   SKILL_DIR: .sbom-skill/skills/geonovum-sbom
 

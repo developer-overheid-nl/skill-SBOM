@@ -21,4 +21,4 @@ Gebruik het [meldformulier van Geonovum](https://fd10.formdesk.com/geonovum/beve
 - stappen om het probleem te reproduceren;
 - de mogelijke gevolgen.
 
-Geonovum handelt meldingen af volgens haar eigen beveiligingsbeleid. Een correctie verschijnt als patchrelease en staat in de [releasenotes](https://github.com/fterpstra/skill-SBOM/releases).
+Geonovum handelt meldingen af volgens haar eigen beveiligingsbeleid. Een correctie verschijnt als patchrelease en staat in de [releasenotes](https://github.com/developer-overheid-nl/skill-sbom/releases).
