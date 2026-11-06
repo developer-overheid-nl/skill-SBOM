@@ -13,7 +13,7 @@ metadata:
   nl.gov.generated-with: generatieve AI
 ---
 
-> **Status: concept.** Deze skill is een hulpmiddel en geen conformiteitsverklaring. Een SBOM die met deze skill is gemaakt, voldoet niet vanzelf aan de CRA of aan andere regelgeving: de opsteller blijft verantwoordelijk voor de inhoud, en de officiële teksten van de [2026 CISA Minimum Elements](https://www.cisa.gov/resources-tools/resources/2026-minimum-elements-software-bill-materials-sbom), [CycloneDX](https://cyclonedx.org/specification/overview/) en [SPDX](https://spdx.dev/) zijn leidend. Overheidsorganisaties die generatieve AI inzetten dienen te voldoen aan het [Overheidsbreed standpunt voor de inzet van generatieve AI](https://open.overheid.nl/documenten/bc03ce31-0cf1-4946-9c94-e934a62ebe73/file). Zie ook de [disclaimer](https://github.com/developer-overheid-nl/skill-sbom/blob/main/DISCLAIMER.md).
+> **Status: concept.** Deze skill is een hulpmiddel en geen conformiteitsverklaring. Een SBOM die met deze skill is gemaakt, voldoet niet vanzelf aan de CRA of aan andere regelgeving: de opsteller blijft verantwoordelijk voor de inhoud, en de officiële teksten van de [2026 CISA Minimum Elements](https://www.cisa.gov/resources-tools/resources/2026-minimum-elements-software-bill-materials-sbom), [CycloneDX](https://cyclonedx.org/specification/overview/) en [SPDX](https://spdx.dev/) zijn leidend. Overheidsorganisaties die generatieve AI inzetten dienen te voldoen aan het [Overheidsbreed standpunt voor de inzet van generatieve AI](https://open.overheid.nl/documenten/bc03ce31-0cf1-4946-9c94-e934a62ebe73/file). Zie ook de [disclaimer](https://github.com/developer-overheid-nl/skills-sbom/blob/main/DISCLAIMER.md).
 
 # SBOM volgens de CISA Minimum Elements 2026
 
