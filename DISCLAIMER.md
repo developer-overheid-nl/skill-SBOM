@@ -30,4 +30,4 @@ De status van de skill staat in het veld `nl.gov.status` in de frontmatter van `
 
 ## Geen garantie
 
-De inhoud wordt aangeboden zonder garantie van volledigheid, juistheid of actualiteit. Fouten en verbeteringen graag als [issue](https://github.com/developer-overheid-nl/skill-sbom/issues) in deze repository.
+De inhoud wordt aangeboden zonder garantie van volledigheid, juistheid of actualiteit. Fouten en verbeteringen graag als [issue](https://github.com/developer-overheid-nl/skills-sbom/issues) in deze repository.

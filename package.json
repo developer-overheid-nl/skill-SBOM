@@ -1,6 +1,6 @@
 {
   "name": "geonovum-sbom",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "private": true,
   "description": "Agent-skill van Geonovum voor het maken van SBOMs. Dit pakket wordt niet naar npm gepubliceerd; package.json is er voor Changesets.",
   "license": "EUPL-1.2",
