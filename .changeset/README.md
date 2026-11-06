@@ -12,6 +12,6 @@ Kies `patch` voor een correctie in de SBOMs die de skill maakt, `minor` voor nie
 
 Zodra er changesets op `main` staan, opent de workflow in `.github/workflows/release.yml` een pull request "Nieuwe release". Daarin is `npm run version` gedraaid: dat verhoogt de versie in `package.json`, schrijft de CHANGELOG, zet dezelfde versie en de datum van die dag in `.plugin/plugin.json` en `publiccode.yml`, en genereert de manifesten per assistent opnieuw. Wie die PR merget, geeft de release vrij: de workflow zet dan de tag `v<versie>` en maakt de GitHub-release aan met de CHANGELOG-tekst van die versie. Draai `npm run version` niet zelf op `main`. De releasedatum in `publiccode.yml` is de dag waarop de versie-PR het laatst is bijgewerkt; merge hem op die dag, dan klopt hij met de GitHub-release.
 
-Tot de eerste release staat de versie op 0.0.0 en is er geen CHANGELOG; de eerste changeset (`eerste-release.md`) levert via diezelfde PR versie 0.1.0 op.
+De eerste release, 0.0.1 van 4 november 2026, is met de hand gemaakt, met de tag `0.0.1`. Vanaf 0.0.2 maakt de workflow de releases.
 
 Dit pakket wordt niet naar npm gepubliceerd; `package.json` is privaat en bestaat alleen voor Changesets.
