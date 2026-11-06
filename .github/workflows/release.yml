@@ -7,13 +7,13 @@
 # v<versie> en maakt zelf de GitHub-release aan met de CHANGELOG-tekst van die
 # versie. Die release is wat de marketplace als nieuwe versie ziet.
 #
-# De actie werkt met een token van een GitHub App, niet met GITHUB_TOKEN: een
-# pull request die met GITHUB_TOKEN is aangemaakt, start geen andere workflows,
-# zodat verplichte controles op de versie-PR nooit zouden draaien. De workflow
-# gebruikt de release-App van de organisatie developer-overheid-nl: de Client ID
-# in RELEASE_PROCESS_APP_CLIENT_ID (een variabele, of anders een secret) en de
-# sleutel in het secret RELEASE_PROCESS_APP_PRIVATE_KEY. De App moet op deze
-# repository geïnstalleerd zijn, met schrijfrecht op contents en pull requests.
+# De actie werkt met GITHUB_TOKEN, zoals de release-workflows van de andere
+# skill-repositories in developer-overheid-nl. Een pull request die met
+# GITHUB_TOKEN is aangemaakt, start geen andere workflows; dat geeft niets,
+# want deze repository heeft geen controles op pull requests. Komen die er wel,
+# dan is een token van een GitHub App nodig, anders draaien ze niet op de
+# versie-PR. In de repo-instellingen moet onder Actions > General "Allow GitHub
+# Actions to create and approve pull requests" aan staan.
 name: Release
 
 on:
@@ -28,16 +28,10 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
-      - name: Token van de release-App ophalen
-        id: app-token
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
-        with:
-          client-id: ${{ vars.RELEASE_PROCESS_APP_CLIENT_ID || secrets.RELEASE_PROCESS_APP_CLIENT_ID }}
-          private-key: ${{ secrets.RELEASE_PROCESS_APP_PRIVATE_KEY }}
-          permission-contents: write
-          permission-pull-requests: write
-
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
@@ -56,7 +50,7 @@ jobs:
       - name: Versie-PR openen of release aanmaken
         uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
         with:
-          github-token: ${{ steps.app-token.outputs.token }}
+          github-token: ${{ github.token }}
           version-script: npm run version
           publish-script: npx changeset git-tag
           pr-title: "Nieuwe release"
